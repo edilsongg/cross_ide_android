@@ -1,52 +1,116 @@
-
 name: Build & Release
 
 on:
   workflow_dispatch:
 
-
 permissions:
-  contents: write    # necessário para criar tags e releases via API
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      # 1. Checkout  
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Set up Flutter
+      # 3. Setup Flutter  
+      - name: Set Up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.3s'
+          flutter-version: '3.22.3'
           channel: 'stable'
 
-      - name: Install dependencies
+      # 4. Install Dependencies  
+      - name: Install Dependencies
         run: flutter pub get
 
-      # Removido: etapa Decode Keystore File
+      # 5. Build APK Debug  
+      - name: Build APK Debug
+        run: flutter build apk --debug
 
-      - name: Decode .env
-        run: echo "${{ secrets.FLUTTER_ENV }}" > ${{ github.workspace }}/.env
-        env:
-          FLUTTER_ENV: ${{ secrets.FLUTTER_ENV }}
+      # 6. Extrair Versão Atual do pubspec.yaml  
+      - name: Extract Version
+        id: extract_version
+        run: |
+          # Ex.: “1.0.0+1”
+          version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2)
+          echo "ORIG_VERSION=$version" >> $GITHUB_ENV
 
-      - name: Build APK (debug)
-        run: flutter build apk --dart-define-from-file=.env --debug
-        # Nenhuma variável de keystore necessária
-
-      - name: Build AppBundle (unsigned)
-        run: flutter build appbundle --debug
-        # Para gerar AAB sem assinatura RL, usamos o modo debug (que não exige keystore)
-
-      - name: Upload Artifact
-        uses: ncipollo/release-action@v1
+      # 7. Obter Última Tag do Git  
+      - name: Get Latest Git Tag
+        id: latest_tag
+        uses: actions-ecosystem/action-get-latest-tag@v1
         with:
-          artifacts: |
-            ${{ github.workspace }}/build/app/outputs/flutter-apk/*.apk
-            ${{ github.workspace }}/build/app/outputs/bundle/*.aab
-          allowUpdates: true
-          makeLatest: true
-          omitBodyDuringUpdate: true
+          tag_prefix: 'v'
+      # latest_tag.outputs.latest holds, por ex., "1.0.0+1" :contentReference[oaicite:2]{index=2}
+
+      # 8. Bump Patch/Build se necessário  
+      - name: Compute Next Version
+        id: bump_version
+        run: |
+          # Se nenhuma tag, usa ORIG_VERSION
+          if [ -z "${{ steps.latest_tag.outputs.latest }}" ]; then
+            next=${ORIG_VERSION}
+          else
+            # separa componentes por '.' ou '+' e incrementa o último (build)
+            latest=${{ steps.latest_tag.outputs.latest }}
+            next=$(echo "$latest" | awk -F'\\+|\\.' '{
+              OFS=".";
+              n=split($0,a,/\\+/);
+              # a[n] é o build ou último patch
+              a[n]=a[n]+1;
+              print a[1]"."a[2]"."a[3]"+"a[4];
+            }')
+          fi
+          echo "NEXT_VERSION=$next" >> $GITHUB_ENV
+          echo "Computed next version: $next"
+
+      # 9. Check Existing Release via actions/github-script  
+      - name: Check Release Existence
+        id: check_release
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const tag = `v${process.env.NEXT_VERSION}`;
+            try {
+              await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              });
+              core.setOutput('exists', 'true');
+            } catch (error) {
+              if (error.status === 404) {
+                core.setOutput('exists', 'false');
+              } else {
+                throw error;
+              }
+            }
+
+      # 10. Create Release se não existir  
+      - name: Create Release
+        if: steps.check_release.outputs.exists == 'false'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.NEXT_VERSION }}
+          release_name: Debug v${{ env.NEXT_VERSION }}
+          draft: false
+          prerelease: true
+
+      # 11. Upload APK  
+      - name: Upload APK
+        if: steps.check_release.outputs.exists == 'false'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: build/app/outputs/flutter-apk/app-debug.apk
+          asset_name: app-debug.apk
+          asset_content_type: application/vnd.android.package-archive
