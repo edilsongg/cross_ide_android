@@ -58,6 +58,11 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+    android {
+      lint {
+          baseline = file("lint-baseline.xml")
+      }
+  }
 }
 configurations.all {
     exclude group: 'com.google.guava', module: 'listenablefuture'

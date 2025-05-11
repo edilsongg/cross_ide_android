@@ -1,0 +1,52 @@
+
+name: Build & Release
+
+on:
+  workflow_dispatch:
+
+
+permissions:
+  contents: write    # necessário para criar tags e releases via API
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.3s'
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Removido: etapa Decode Keystore File
+
+      - name: Decode .env
+        run: echo "${{ secrets.FLUTTER_ENV }}" > ${{ github.workspace }}/.env
+        env:
+          FLUTTER_ENV: ${{ secrets.FLUTTER_ENV }}
+
+      - name: Build APK (debug)
+        run: flutter build apk --dart-define-from-file=.env --debug
+        # Nenhuma variável de keystore necessária
+
+      - name: Build AppBundle (unsigned)
+        run: flutter build appbundle --debug
+        # Para gerar AAB sem assinatura RL, usamos o modo debug (que não exige keystore)
+
+      - name: Upload Artifact
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: |
+            ${{ github.workspace }}/build/app/outputs/flutter-apk/*.apk
+            ${{ github.workspace }}/build/app/outputs/bundle/*.aab
+          allowUpdates: true
+          makeLatest: true
+          omitBodyDuringUpdate: true
