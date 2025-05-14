@@ -1,8 +1,12 @@
 name: "Build & Release"
-# see https://medium.com/@colonal/automating-flutter-builds-and-releases-with-github-actions-77ccf4a1ccdd
 
 on:
   workflow_dispatch:
+
+permissions:
+  contents: read         # leitura de código e metadados
+  actions: write         # necessário para upload/download de artifacts
+  packages: write        # opcional, se usar packages
 
 jobs:
   build:
@@ -11,77 +15,74 @@ jobs:
     steps:
 
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Extract version from pubspec.yaml
         id: extract_version
         run: |
           version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
           echo "VERSION=$version" >> $GITHUB_ENV
-          code_server=$(grep '^code_server: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
-          echo "CSVERSION=$code_server" >> $GITHUB_ENV
 
       - name: Set Up Java
-        uses: actions/setup-java@v3.12.0
+        uses: actions/setup-java@v3
         with:
-          distribution: 'oracle'
-          java-version: '17'
+          distribution: oracle
+          java-version: 17
 
       - name: Set Up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.3'
-          channel: 'stable'
+          channel: stable
 
       - name: Install Dependencies
         run: flutter pub get
 
       - name: Decode Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r' | base64 --decode > android/app/keystore.jks
 
       - name: Create key.properties
         run: |
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=keystore.jks" >> android/key.properties
+          cat <<EOF > android/key.properties
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=keystore.jks
+          EOF
 
-      - name: Build APK
-        run: flutter build apk --release --no-tree-shake-icons --split-per-abi --dart-define=VERSION=${{ env.VERSION }} 
-
-#FIXME:      - name: Check if Tag Exists
-#FIXME:        id: check_tag
-#FIXME:        run: |
-#FIXME:          if git rev-parse "v${{ env.VERSION }}" >/dev/null 2>&1; then
-#FIXME:            echo "TAG_EXISTS=true" >> $GITHUB_ENV
-#FIXME:          else
-#FIXME:            echo "TAG_EXISTS=false" >> $GITHUB_ENV
-#FIXME:          fi
+      - name: Build APKs
+        run: |
+          flutter build apk \
+            --release \
+            --no-tree-shake-icons \
+            --split-per-abi \
+            --dart-define=VERSION=${{ env.VERSION }}
 
       - name: Modify Tag
-#FIXME:        if: env.TAG_EXISTS == 'true'
         id: modify_tag
         run: |
           new_version="${{ env.VERSION }}-build-${{ github.run_number }}"
           echo "VERSION=$new_version" >> $GITHUB_ENV
 
-      - name: Rename Artifacts 
+      - name: Rename Artifacts
         run: |
-          mv build/app/outputs/apk/release/app-arm64-*release.apk "build/app/outputs/apk/release/FlutterIDEAndroid_${{ env.VERSION }}_Android_arm64.apk"
-          mv build/app/outputs/apk/release/app-armeabi-*release.apk "build/app/outputs/apk/release/FlutterIDEAndroid_${{ env.VERSION }}_Android_arm_v7a.apk"
-          mv build/app/outputs/apk/release/app-x86_64-*release.apk "build/app/outputs/apk/release/FlutterIDEAndroid_${{ env.VERSION }}_Android_x86_64.apk"
+          cd build/app/outputs/apk/release
+          for file in app-*-release.apk; do
+            abi=$(echo "${file}" | cut -d '-' -f 2)
+            mv "${file}" "FlutterIDEAndroid_${{ env.VERSION }}_Android_${abi}.apk"
+          done
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Releases
-          path: |
-            build/app/outputs/apk/release/*_arm64.apk
+          path: build/app/outputs/apk/release/*.apk
+          retention-days: 30
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/app/outputs/apk/release/*_arm64.apk"
           tag: v${{ env.VERSION }}
+          artifacts: build/app/outputs/apk/release/*.apk
           token: ${{ secrets.TOKEN }}
