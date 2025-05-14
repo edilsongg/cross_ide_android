@@ -54,6 +54,7 @@ class _AutoCompleteEditorState extends State<AutoCompleteEditor> {
           },
         ),
         child: CodeEditor(
+          padding: const EdgeInsets.only(left: 10, right: 200),
           style: CodeEditorStyle(
             fontFamily: vm.fontFamily,
             fontSize: vm.fontSize,

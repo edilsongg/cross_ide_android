@@ -1,0 +1,23 @@
+name: file_tree_view
+description: "A Flutter package for displaying foldable file directory trees."
+version: 0.0.6
+homepage: https://github.com/AthulNoobie/file_tree_view
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+#environment:
+#  sdk: ^3.5.4
+#  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  path: ^1.9.0
+  font_awesome_flutter: ^10.8.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:

@@ -59,7 +59,6 @@ class OnboardingViewmodel extends ChangeNotifier {
     _hasInternet = await _networkUtil.checkInitialConnection();
     notifyListeners();
 
-    // 2. Escuta mudanças contínuas
     _connectivitySub = _networkUtil.onConnectivityChanged.listen((status) {
       if (_hasInternet != status) {
         _hasInternet = status;
@@ -69,7 +68,6 @@ class OnboardingViewmodel extends ChangeNotifier {
   }
 
   Future<void> init() async {
-    // 1. Checa estado inicial
     await checkInternetConnection();
     checkPermissions();
     await loadSdkVersions();
@@ -125,11 +123,9 @@ class OnboardingViewmodel extends ChangeNotifier {
   }
 
   Future<void> requestInstallPermission() async {
-    // Em Android, pedir permissão de instalar fontes desconhecidas não é direto via permission_handler.
-    // Suponha que usemos um método nativo. Aqui simulamos:
     final status = await Permission.requestInstallPackages.request();
     _installPermissionGranted = status.isGranted;
-    // installPermissionGranted = true;
+
     if (!installPermissionGranted) {
       _errorMessage = 'Por favor, permita instalação de apps';
     } else {
@@ -176,7 +172,6 @@ class OnboardingViewmodel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Função para verificar as permissões
   Future<void> checkPermissions() async {
     PermissionStatus storageStatus =
         await Permission.manageExternalStorage.status;

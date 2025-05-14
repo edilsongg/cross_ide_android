@@ -1,7 +1,6 @@
-// lib/view_models/editor_view_model.dart
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 class EditorViewModel extends ChangeNotifier {
   Directory? projectDir;
@@ -9,11 +8,12 @@ class EditorViewModel extends ChangeNotifier {
   String fileContent = '';
 
   EditorViewModel() {
-    openMain();
+    // openMain();
   }
 
-  void openMain() {
-    final main = File('${projectDir?.path}${Platform.pathSeparator}main.dart');
+  void openMain(String path) {
+    final main = File('$path${Platform.pathSeparator}main.dart');
+    print(main);
     if (main.existsSync()) {
       currentFilePath = main.path;
       fileContent = main.readAsStringSync();
@@ -21,7 +21,7 @@ class EditorViewModel extends ChangeNotifier {
       currentFilePath = null;
       fileContent = '';
     }
-    notifyListeners();
+    //   notifyListeners();
   }
 
   void openFile(String path) {

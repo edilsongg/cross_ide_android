@@ -14,7 +14,7 @@ class SettingsModel {
   final bool autoLineBreak;
   final bool trimSpaces;
   final List<String> extensions;
-  final List<String> customSymbols;
+  final String customSymbols;
   final bool lineNumbers;
   final String fontFamily;
   final bool autoSave;
@@ -36,7 +36,8 @@ class SettingsModel {
     this.autoLineBreak = false,
     this.trimSpaces = false,
     this.extensions = const [],
-    this.customSymbols = const [],
+    // ignore: unnecessary_string_escapes
+    this.customSymbols = '!@#%^&*()_+{}:"<>?;=-[]\/.,:',
     this.lineNumbers = false,
     this.fontFamily = 'FiraCode',
     this.autoSave = true,
@@ -56,7 +57,7 @@ class SettingsModel {
     bool? autoLineBreak,
     bool? trimSpaces,
     List<String>? extensions,
-    List<String>? customSymbols,
+    String? customSymbols,
     bool? lineNumbers,
     String? fontFamily,
     bool? autoSave,
@@ -76,7 +77,7 @@ class SettingsModel {
       autoLineBreak: autoLineBreak ?? this.autoLineBreak,
       trimSpaces: trimSpaces ?? this.trimSpaces,
       extensions: extensions ?? List.from(this.extensions),
-      customSymbols: customSymbols ?? List.from(this.customSymbols),
+      customSymbols: customSymbols ?? this.customSymbols,
       lineNumbers: lineNumbers ?? this.lineNumbers,
       fontFamily: fontFamily ?? this.fontFamily,
       autoSave: autoSave ?? this.autoSave,
@@ -127,7 +128,7 @@ class SettingsModel {
       autoLineBreak: map['autoLineBreak'] as bool,
       trimSpaces: map['trimSpaces'] as bool,
       extensions: List<String>.from(map['extensions'] as List<dynamic>),
-      customSymbols: List<String>.from(map['customSymbols'] as List<dynamic>),
+      customSymbols: map['customSymbols'] as String,
       lineNumbers: map['lineNumbers'] as bool,
       fontFamily: map['fontFamily'] as String,
       autoSave: map['autoSave'] as bool,

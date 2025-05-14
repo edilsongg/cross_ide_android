@@ -18,4 +18,8 @@ List<SingleChildWidget> providers = [
   ),
   ChangeNotifierProvider(create: (_) => ProjectListViewModel()),
   ChangeNotifierProvider(create: (_) => EditorViewModel()),
+/*   ChangeNotifierProvider(
+    create: (_) => AnalysisViewModel()
+      ..init(sdkPath: '${RuntimeEnvir.usrPath}/opt/flutter/bin/cache/dart-sdk'),
+  ), */
 ];

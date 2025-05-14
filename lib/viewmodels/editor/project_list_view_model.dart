@@ -1,4 +1,3 @@
-// lib/view_models/project_list_view_model.dart
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

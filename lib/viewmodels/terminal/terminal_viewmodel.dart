@@ -1,4 +1,3 @@
-// lib/viewmodels/home_viewmodel.dart
 import 'dart:convert';
 import 'dart:io';
 
@@ -19,7 +18,6 @@ class TerminalViewModel extends ChangeNotifier {
   List<PtyTermModel> get terms => List.unmodifiable(_terms);
   int get currentIndex => _currentIndex;
 
-  /// Configura e carrega terminais persistidos
   Future<void> loadTerminals(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final count = prefs.getInt(Consts.prefsKey) ?? Consts.initialTerminals;
@@ -43,11 +41,10 @@ class TerminalViewModel extends ChangeNotifier {
     final term = Terminal(maxLines: 10000);
     final ctrl = TerminalController();
 
-    // Se Android e sem bash instalado, inicializa via DownloadScreen + initShell
     if (Platform.isAndroid && !hasBash()) {
       await initTerminal(context, term, ctrl);
     } else {
-      await runCommand(
+      await createTerm(
         context: context,
         term: term,
         ctrl: ctrl,
@@ -57,21 +54,18 @@ class TerminalViewModel extends ChangeNotifier {
     }
   }
 
-  /// Verifica se o binário bash existe
   bool hasBash() {
     final File bashFile = File('${RuntimeEnvir.binPath}/bash');
     return bashFile.existsSync();
   }
 
-  /// Cria um novo PTY e vincula ao Terminal padrão (bash -l)
-  Future<void> runCommand({
+  Future<void> createTerm({
     required BuildContext context,
     required Terminal term,
     required TerminalController ctrl,
     // String? command,
     //String? workingDirectory,
   }) async {
-    // Prepare ambiente
     Map<String, String> envir = Map.from(Platform.environment)
       ..addAll({
         'TERM': 'xterm-256color',
@@ -83,7 +77,6 @@ class TerminalViewModel extends ChangeNotifier {
       envir['LD_PRELOAD'] = '${RuntimeEnvir.usrPath}/lib/libtermux-exec.so';
     }
 
-    // Cria PTY (usa createPTY de pty_util.dart)
     final pty = createPTY(
       arguments: ['-l'],
       columns: term.viewWidth,
@@ -99,7 +92,6 @@ class TerminalViewModel extends ChangeNotifier {
         .transform(const Utf8Decoder(allowMalformed: true))
         .listen(term.write);
 
-    // Adiciona à lista
     _terms.add(PtyTermModel(pty: pty, terminal: term, controller: ctrl));
     _currentIndex = _terms.length - 1;
 
@@ -107,34 +99,28 @@ class TerminalViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Inicializa ambiente via shell /system/bin/sh + DownloadScreen + initShell
   Future<void> initTerminal(
     BuildContext context,
     Terminal term,
     TerminalController ctrl,
   ) async {
-    // Cria PTY com /system/bin/sh
     final pty = createPTY(
       shell: '/system/bin/sh',
       columns: term.viewWidth,
       rows: term.viewHeight,
     );
 
-    // Pequeno delay para o terminal estabilizar
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // Exibe DownloadScreen para bootstrap
     await showDialog(
       // ignore: use_build_context_synchronously
       context: context,
       builder: (_) => const DownloadScreen(),
     );
 
-    // Envia script de inicialização
     pty.writeString(Consts.initShell);
     pty.writeString('initApp\n');
 
-    // Vincula como nos outros casos
     term.onOutput = (data) => pty.writeString(data);
     term.onResize = (w, h, pw, ph) => pty.resize(w, h);
     pty.output

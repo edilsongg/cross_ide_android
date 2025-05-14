@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_string_escapes
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,8 +53,8 @@ class SettingsViewModel extends ChangeNotifier {
   List<String> get extensions => _extensions;
 
   // Símbolos customizados
-  List<String> _customSymbols = [];
-  List<String> get customSymbols => _customSymbols;
+  String _customSymbols = '''!@#%^&*()_+{}:"<>?;=-[]\/.,:''';
+  String get customSymbols => _customSymbols;
 
   // Exibição de números de linha
   bool _lineNumbers = false;
@@ -211,7 +213,7 @@ class SettingsViewModel extends ChangeNotifier {
     await _save();
   }
 
-  void setCustomSymbols(List<String> symbols) async {
+  void setCustomSymbols(String symbols) async {
     _customSymbols = symbols;
 
     notifyListeners();

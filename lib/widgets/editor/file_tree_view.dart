@@ -1,10 +1,11 @@
-// lib/widgets/file_tree_view.dart
-
 import 'dart:io';
 
+import 'package:cross_ide_android/utils/common_dialogs_util.dart';
+import 'package:file_icon/file_icon.dart';
+import 'package:file_tree_view/file_tree_view.dart';
+import 'package:file_tree_view/style.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:path/path.dart' as p;
 import 'package:single_child_two_dimensional_scroll_view/single_child_two_dimensional_scroll_view.dart'; // para basename() :contentReference[oaicite:7]{index=7}
 
 typedef NodeTap = void Function(FileSystemEntity node);
@@ -23,107 +24,10 @@ class FileTreeView extends StatefulWidget {
   });
 
   @override
-  _FileTreeViewState createState() => _FileTreeViewState();
+  FileTreeViewState createState() => FileTreeViewState();
 }
 
-class _FileTreeViewState extends State<FileTreeView> {
-  late final Set<String> _expanded;
-
-  @override
-  void initState() {
-    super.initState();
-    // Já começa com a raiz expandida
-    _expanded = {widget.root.path};
-  }
-
-  void _toggle(String path) {
-    setState(() {
-      if (_expanded.contains(path)) {
-        _expanded.remove(path);
-      } else {
-        _expanded.add(path);
-      }
-    });
-  }
-
-  Widget _buildNode(FileSystemEntity node, int indent, ColorScheme colors) {
-    final isDir = node is Directory;
-
-    // Lista filhos (pastas e arquivos), pode lançar se sem permissão :contentReference[oaicite:8]{index=8}
-    late final List<FileSystemEntity> children;
-    try {
-      children = isDir
-          ? (node).listSync(followLinks: true).toList()
-          : <FileSystemEntity>[];
-    } catch (e) {
-      // Deixe o erro visível em debug para saber se é permissão no Android :contentReference[oaicite:9]{index=9}
-      debugPrint('Erro listando ${node.path}: $e');
-      children = <FileSystemEntity>[];
-    }
-
-    // Ordena: pastas primeiro, depois arquivos, alfabeticamente
-    children.sort((a, b) {
-      if (a is Directory && b is! Directory) return -1;
-      if (a is! Directory && b is Directory) return 1;
-      return p.basename(a.path).compareTo(p.basename(b.path));
-    });
-
-    final isExpanded = _expanded.contains(node.path);
-    final displayName = p.basename(
-        node.path); // só o nome :contentReference[oaicite:10]{index=10}
-
-    return Padding(
-      padding: EdgeInsets.only(left: indent.toDouble()),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              if (isDir) _toggle(node.path);
-              widget.onTap(node);
-            },
-            onLongPress: () => widget.onLongPress(node),
-            child: Row(
-              children: [
-                if (isDir)
-                  Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_down
-                        : Icons.keyboard_arrow_right,
-                  ),
-                Icon(
-                  isDir
-                      ? Icons.folder_rounded
-                      : Icons.insert_drive_file_outlined,
-                  color: colors.primary,
-                  /* isDir ? Colors.amber[700] : */ /* Colors.grey[700], */
-                  size: 34,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  displayName,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isDir ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isDir && isExpanded)
-            ...children.map((child) {
-              return _buildNode(
-                child,
-                indent + 16,
-                colors,
-              );
-            }),
-        ],
-      ),
-    );
-  }
-
+class FileTreeViewState extends State<FileTreeView> {
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme;
@@ -174,28 +78,63 @@ class _FileTreeViewState extends State<FileTreeView> {
           ),
           const Gap(10),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Center(
-                    child: Text(
-                      'Explorador',
-                      style: textStyle.titleLarge,
-                    ),
+            child: Column(
+              children: [
+                const Gap(10),
+                Center(
+                  child: Text(
+                    'Explorador',
+                    style: textStyle.titleLarge,
                   ),
-                  const Gap(10),
-                  Expanded(
-                    child: SingleChildTwoDimensionalScrollView(
-                      child: _buildNode(
-                        widget.root,
-                        0,
-                        colors,
+                ),
+                const Gap(10),
+                Expanded(
+                  child: SingleChildTwoDimensionalScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: DirectoryTreeViewer(
+                        rootPath: widget.root.path,
+                        /* enableCreateFileOption: true,
+                        enableCreateFolderOption: true,
+                        enableDeleteFileOption: true,
+                        enableDeleteFolderOption: true, */
+                        folderStyle: FolderStyle(
+                          folderNameStyle: TextStyle(color: Colors.grey[400]),
+                          folderClosedicon: Icon(
+                            color: colors.primary,
+                            Icons.folder_rounded,
+                            size: 34,
+                          ),
+                          /*  folderOpenedicon: Icon(
+                            color: colors.primary,
+                            Icons.folder_outlined,
+                            size: 34,
+                          ), */
+                        ),
+                        fileIconBuilder: (extension) => FileIcon(
+                          extension,
+                          size: 34,
+                        ),
+                        onFileTap: (node) {
+                          widget.onTap(node);
+                        },
+                        onLongPress: (node) => showFileSystemContextMenu(
+                          context,
+                          node: node,
+                          onRename: (v) {},
+                          onDelete: (v) {},
+                          onCopy: (v) {},
+                          onPaste: (v) {},
+                          onCut: (v) {},
+                          onShare: (v) {},
+                          onCopyPath: (v) {},
+                          onOpenWith: (v) {},
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

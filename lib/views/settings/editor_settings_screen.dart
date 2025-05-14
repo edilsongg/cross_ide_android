@@ -18,7 +18,7 @@ class _EditorSettingsScreenState extends State<EditorSettingsScreen> {
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme;
     final colors = Theme.of(context).colorScheme;
-    final vm = context.read<SettingsViewModel>(); // pega o provider sem escutar
+    final vm = context.read<SettingsViewModel>();
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: AppBar(
@@ -176,7 +176,7 @@ class _EditorSettingsScreenState extends State<EditorSettingsScreen> {
             elevation: 0,
             color: colors.secondaryContainer,
             margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 5),
-            child: Selector<SettingsViewModel, List<String>>(
+            child: Selector<SettingsViewModel, String>(
                 selector: (_, vm) =>
                     vm.customSymbols, // seleciona só o fontSize
                 builder: (context, customSymbols, child) {
@@ -188,7 +188,7 @@ class _EditorSettingsScreenState extends State<EditorSettingsScreen> {
                     ),
                     subtitle: Text(vm.customSymbols.isEmpty
                         ? 'Nenhum símbolo definido'
-                        : customSymbols.join(', ')),
+                        : customSymbols),
                     onTap: () async {
                       final symbols = await showCustomSymbolsDialog(
                         context,

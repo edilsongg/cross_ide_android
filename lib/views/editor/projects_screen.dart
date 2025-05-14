@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:cross_ide_android/utils/common_dialogs_util.dart';
 import 'package:file_picker/file_picker.dart'; // ← import adicionado :contentReference[oaicite:6]{index=6}
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../models/project.dart';
+import '../../utils/editor_util.dart';
 import '../../viewmodels/editor/project_list_view_model.dart';
 
 class ProjectsScreen extends StatelessWidget {
@@ -60,7 +58,7 @@ class ProjectsScreen extends StatelessWidget {
             ),
             child: ListTile(
               leading: FutureBuilder<Widget>(
-                future: _buildProjectIcon(p),
+                future: buildProjectIcon(p),
                 builder: (_, snap) => snap.data ?? const SizedBox(),
               ),
               title: Text(
@@ -71,7 +69,7 @@ class ProjectsScreen extends StatelessWidget {
                 p.path,
                 style: textStyle.bodyMedium,
               ),
-              onTap: () => _openProject(context, p),
+              onTap: () => openProject(context, vm, p),
               onLongPress: () {
                 confirmRemoveProject(context, p, () {
                   vm.removeProject(p);
@@ -87,37 +85,10 @@ class ProjectsScreen extends StatelessWidget {
           final dirPath = await FilePicker.platform.getDirectoryPath();
           if (dirPath != null) {
             final p = Project(path: dirPath);
-            _openProject(context, p);
+            openProject(context, vm, p);
           }
         },
       ),
     );
-  }
-
-  String iconPath(Project proj) => p.join(
-        proj.path,
-        'android',
-        'app',
-        'src',
-        'main',
-        'res',
-        'mipmap-hdpi',
-        'ic_launcher.png',
-      );
-  Future<Widget> _buildProjectIcon(Project p) async {
-    final path = iconPath(p);
-    final file = File(path);
-    if (await file.exists()) {
-      return Image.file(file, width: 48, height: 48);
-    } else {
-      return const Icon(Icons.folder, size: 48);
-    }
-  }
-
-  void _openProject(BuildContext context, Project p) {
-    final vm = context.read<ProjectListViewModel>();
-    vm.addProject(p).then((_) {
-      Navigator.pushNamed(context, '/editor', arguments: p);
-    });
   }
 }
