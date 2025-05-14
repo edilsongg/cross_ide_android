@@ -28,7 +28,7 @@ jobs:
 
       # 5. Build APK Debug  
       - name: Build APK Debug
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       # 6. Extrair Versão Atual do pubspec.yaml  
       - name: Extract Version
