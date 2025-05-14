@@ -34,7 +34,7 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-signingConfigs {
+/*signingConfigs {
         
         // start
         release {
@@ -45,7 +45,7 @@ signingConfigs {
         }
     // end
     }
-    
+    */
     kotlinOptions {
         jvmTarget = '1.8'
     }
@@ -78,12 +78,12 @@ signingConfigs {
         }
     }
 
-    project.android.applicationVariants.all { variant ->
+ /*   project.android.applicationVariants.all { variant ->
         variant.outputs.each { output ->
             output.versionCodeOverride = flutterVersionCode.toInteger()
         }
     }
-    
+    */
 }
 configurations.all {
     exclude group: 'com.google.guava', module: 'listenablefuture'
