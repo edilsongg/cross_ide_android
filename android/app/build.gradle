@@ -80,7 +80,7 @@ signingConfigs {
 
     project.android.applicationVariants.all { variant ->
         variant.outputs.each { output ->
-            output.versionCodeOverride = flutter.versionCode
+            output.versionCodeOverride = flutterVersionCode.toInteger()
         }
     }
     
