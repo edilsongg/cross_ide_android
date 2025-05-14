@@ -21,12 +21,6 @@ jobs:
           version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
           echo "VERSION=$version" >> $GITHUB_ENV
 
-      - name: Set Up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: oracle
-          java-version: 17
-
       - name: Set Up Flutter
         uses: subosito/flutter-action@v2
         with:
