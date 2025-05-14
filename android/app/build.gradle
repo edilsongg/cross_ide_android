@@ -21,7 +21,10 @@ def flutterVersionName = localProperties.getProperty('flutter.versionName')
 if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
-
+// start
+def keystorePropertiesFile = rootProject.file('key.properties')
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 android {
     namespace "com.example.cross_ide_android"
     compileSdk 34//flutter.compileSdkVersion
