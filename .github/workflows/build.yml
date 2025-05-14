@@ -1,116 +1,87 @@
-name: Build & Release
+name: "Build & Release"
+# see https://medium.com/@colonal/automating-flutter-builds-and-releases-with-github-actions-77ccf4a1ccdd
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
+    name: Build & Release
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checkout  
-      - name: Checkout Repository
-        uses: actions/checkout@v4
 
-      # 3. Setup Flutter  
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Extract version from pubspec.yaml
+        id: extract_version
+        run: |
+          version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
+          echo "VERSION=$version" >> $GITHUB_ENV
+          code_server=$(grep '^code_server: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
+          echo "CSVERSION=$code_server" >> $GITHUB_ENV
+
+      - name: Set Up Java
+        uses: actions/setup-java@v3.12.0
+        with:
+          distribution: 'oracle'
+          java-version: '17'
+
       - name: Set Up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.3'
           channel: 'stable'
 
-      # 4. Install Dependencies  
       - name: Install Dependencies
         run: flutter pub get
 
-      # 5. Build APK Debug  
-      - name: Build APK Debug
-        run: flutter build apk --release --no-tree-shake-icons
-
-      # 6. Extrair Versão Atual do pubspec.yaml  
-      - name: Extract Version
-        id: extract_version
+      - name: Decode Keystore
         run: |
-          # Ex.: “1.0.0+1”
-          version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2)
-          echo "ORIG_VERSION=$version" >> $GITHUB_ENV
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
 
-      # 7. Obter Última Tag do Git  
-      - name: Get Latest Git Tag
-        id: latest_tag
-        uses: actions-ecosystem/action-get-latest-tag@v1
-        with:
-          tag_prefix: 'v'
-      # latest_tag.outputs.latest holds, por ex., "1.0.0+1" :contentReference[oaicite:2]{index=2}
-
-      # 8. Bump Patch/Build se necessário  
-      - name: Compute Next Version
-        id: bump_version
+      - name: Create key.properties
         run: |
-          # Se nenhuma tag, usa ORIG_VERSION
-          if [ -z "${{ steps.latest_tag.outputs.latest }}" ]; then
-            next=${ORIG_VERSION}
-          else
-            # separa componentes por '.' ou '+' e incrementa o último (build)
-            latest=${{ steps.latest_tag.outputs.latest }}
-            next=$(echo "$latest" | awk -F'\\+|\\.' '{
-              OFS=".";
-              n=split($0,a,/\\+/);
-              # a[n] é o build ou último patch
-              a[n]=a[n]+1;
-              print a[1]"."a[2]"."a[3]"+"a[4];
-            }')
-          fi
-          echo "NEXT_VERSION=$next" >> $GITHUB_ENV
-          echo "Computed next version: $next"
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=keystore.jks" >> android/key.properties
 
-      # 9. Check Existing Release via actions/github-script  
-      - name: Check Release Existence
-        id: check_release
-        uses: actions/github-script@v6
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons --split-per-abi --dart-define=VERSION=${{ env.VERSION }} 
+
+#FIXME:      - name: Check if Tag Exists
+#FIXME:        id: check_tag
+#FIXME:        run: |
+#FIXME:          if git rev-parse "v${{ env.VERSION }}" >/dev/null 2>&1; then
+#FIXME:            echo "TAG_EXISTS=true" >> $GITHUB_ENV
+#FIXME:          else
+#FIXME:            echo "TAG_EXISTS=false" >> $GITHUB_ENV
+#FIXME:          fi
+
+      - name: Modify Tag
+#FIXME:        if: env.TAG_EXISTS == 'true'
+        id: modify_tag
+        run: |
+          new_version="${{ env.VERSION }}-build-${{ github.run_number }}"
+          echo "VERSION=$new_version" >> $GITHUB_ENV
+
+      - name: Rename Artifacts 
+        run: |
+          mv build/app/outputs/apk/release/app-arm64-*release.apk "build/app/outputs/apk/release/FlutterIDEAndroid_${{ env.VERSION }}_Android_arm64.apk"
+          mv build/app/outputs/apk/release/app-armeabi-*release.apk "build/app/outputs/apk/release/FlutterIDEAndroid_${{ env.VERSION }}_Android_arm_v7a.apk"
+          mv build/app/outputs/apk/release/app-x86_64-*release.apk "build/app/outputs/apk/release/FlutterIDEAndroid_${{ env.VERSION }}_Android_x86_64.apk"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const tag = `v${process.env.NEXT_VERSION}`;
-            try {
-              await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag,
-              });
-              core.setOutput('exists', 'true');
-            } catch (error) {
-              if (error.status === 404) {
-                core.setOutput('exists', 'false');
-              } else {
-                throw error;
-              }
-            }
+          name: Releases
+          path: |
+            build/app/outputs/apk/release/*_arm64.apk
 
-      # 10. Create Release se não existir  
       - name: Create Release
-        if: steps.check_release.outputs.exists == 'false'
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: v${{ env.NEXT_VERSION }}
-          release_name: Debug v${{ env.NEXT_VERSION }}
-          draft: false
-          prerelease: true
-
-      # 11. Upload APK  
-      - name: Upload APK
-        if: steps.check_release.outputs.exists == 'false'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: build/app/outputs/flutter-apk/app-release.apk
-          asset_name: app-release.apk
-          asset_content_type: application/vnd.android.package-archive
+          artifacts: "build/app/outputs/apk/release/*_arm64.apk"
+          tag: v${{ env.VERSION }}
+          token: ${{ secrets.TOKEN }}
